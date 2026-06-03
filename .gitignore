@@ -1,0 +1,102 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*$py.class
+
+# 分发 / 打包
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+wheels/
+*.whl
+MANIFEST
+pip-wheel-metadata/
+
+# 安装器日志
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── 虚拟环境 ─────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ── 类型检查 / 测试 ───────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+*.cover
+
+# ── 工具链 ───────────────────────────────────────────────
+.ruff_cache/
+.tox/
+.nox/
+
+# ── Jupyter ──────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── 环境变量 / 密钥（绝不入库）──────────────────────────────
+.env
+.env.*
+!.env.example
+config.yaml
+!config.yaml.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# ── 数据库 / 向量库 ───────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+chroma/
+.chroma/
+faiss_index/
+*.index
+
+# ── 日志 / 运行时缓存 ─────────────────────────────────────
+*.log
+logs/
+.cache/
+tmp/
+temp/
+
+# ── IDE ──────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ── 操作系统 ─────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
