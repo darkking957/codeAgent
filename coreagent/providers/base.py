@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from enum import Enum
-from typing import AsyncGenerator
 
 
 class ChunkType(Enum):
@@ -19,10 +19,12 @@ class StreamChunk:
 
 
 class BaseProvider(ABC):
+    # 注：声明为返回 AsyncIterator 的普通方法（而非 async def），这是抽象异步生成器的
+    # 惯用签名——实现仍是 async def + yield，调用方仍 `async for`，运行时契约不变。
     @abstractmethod
-    async def stream_chat(
+    def stream_chat(
         self,
         messages: list[dict],
         system: str | None = None,
-    ) -> AsyncGenerator[StreamChunk, None]:
+    ) -> AsyncIterator[StreamChunk]:
         ...

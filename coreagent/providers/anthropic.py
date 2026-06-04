@@ -1,17 +1,29 @@
+from collections.abc import AsyncIterator
+
 import anthropic as _anthropic
+
+from coreagent.config import Config
 from coreagent.providers.base import BaseProvider, ChunkType, StreamChunk
 
 
 class AnthropicProvider(BaseProvider):
-    def __init__(self, config):
+    def __init__(self, config: Config) -> None:
         self.config = config
-        kwargs = {"api_key": config.api_key}
+        kwargs: dict = {"api_key": config.api_key}
         if config.base_url:
             kwargs["base_url"] = config.base_url
         self.client = _anthropic.AsyncAnthropic(**kwargs)
 
-    async def stream_chat(self, messages, system=None):
-        max_tokens = 16000 if self.config.thinking.enabled else 8096
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        system: str | None = None,
+    ) -> AsyncIterator[StreamChunk]:
+        max_tokens = (
+            self.config.thinking_max_tokens
+            if self.config.thinking.enabled
+            else self.config.max_tokens
+        )
         params: dict = {
             "model": self.config.model,
             "max_tokens": max_tokens,
@@ -39,7 +51,7 @@ class AnthropicProvider(BaseProvider):
                         yield StreamChunk(ChunkType.TEXT, delta.text)
             final_message = await stream.get_final_message()
 
-        blocks = None
+        blocks: list | None = None
         if self.config.thinking.enabled and final_message:
             blocks = []
             for block in final_message.content:

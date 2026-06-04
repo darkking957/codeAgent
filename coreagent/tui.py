@@ -234,6 +234,12 @@ class TUI:
         self.console.rule(style="dim")
         self.console.print()
 
+    # ── retry notice ─────────────────────────────────────────────────────────────
+
+    def _on_retry(self, attempt: int, wait: int) -> None:
+        sys.stdout.write(f"\n第 {attempt} 次重试（{wait}s 后）…\n")
+        sys.stdout.flush()
+
     # ── main loop ──────────────────────────────────────────────────────────────
 
     async def run(self) -> None:
@@ -283,7 +289,9 @@ class TUI:
 
             try:
                 async for chunk in stream_with_retry(
-                    self.provider, self.conversation.get_messages()
+                    self.provider,
+                    self.conversation.get_messages(),
+                    on_retry=self._on_retry,
                 ):
                     if not first_token:
                         stop_spin.set()
