@@ -25,11 +25,18 @@ class ScriptedProvider(BaseProvider):
     def __init__(self, attempts: list[list]) -> None:
         self._attempts = list(attempts)
         self.calls = 0
+        # 记录每次调用收到的 tools / system / messages 入参，便于断言注入与装配。
+        self.tools_seen: list = []
+        self.system_seen: list = []
+        self.messages_seen: list = []
 
-    async def stream_chat(self, messages, system=None):
+    async def stream_chat(self, messages, system=None, tools=None):
         idx = self.calls if self.calls < len(self._attempts) else len(self._attempts) - 1
         entry = self._attempts[idx]
         self.calls += 1
+        self.tools_seen.append(tools)
+        self.system_seen.append(system)
+        self.messages_seen.append(messages)
         for item in entry:
             if isinstance(item, BaseException):
                 raise item
@@ -40,8 +47,52 @@ def text_chunk(s: str) -> StreamChunk:
     return StreamChunk(ChunkType.TEXT, s)
 
 
-def done_chunk(blocks=None) -> StreamChunk:
-    return StreamChunk(ChunkType.DONE, blocks=blocks)
+def done_chunk(blocks=None, tool_calls=None, stop_reason=None) -> StreamChunk:
+    return StreamChunk(
+        ChunkType.DONE, blocks=blocks, tool_calls=tool_calls, stop_reason=stop_reason
+    )
+
+
+def tool_call(name: str, arguments: dict, call_id: str = "call_1") -> dict:
+    """构造一条工具调用（与 provider DONE.tool_calls 同构）。"""
+    return {"id": call_id, "name": name, "input": arguments}
+
+
+def tool_use_done(
+    name: str,
+    arguments: dict,
+    call_id: str = "call_1",
+    text: str = "",
+    stop_reason: str = "tool_use",
+) -> StreamChunk:
+    """构造一个携带工具调用的 DONE chunk：含 assistant 内容块 + 解析后的工具调用。"""
+    blocks: list = []
+    if text:
+        blocks.append({"type": "text", "text": text})
+    blocks.append({"type": "tool_use", "id": call_id, "name": name, "input": arguments})
+    return StreamChunk(
+        ChunkType.DONE,
+        blocks=blocks,
+        tool_calls=[tool_call(name, arguments, call_id)],
+        stop_reason=stop_reason,
+    )
+
+
+def tools_done(tool_calls: list[dict], text: str = "", stop_reason: str = "tool_use") -> StreamChunk:
+    """构造一个携带多个工具调用的 DONE chunk（同一轮多工具，供并发/分类测试）。"""
+    blocks: list = []
+    if text:
+        blocks.append({"type": "text", "text": text})
+    for tc in tool_calls:
+        blocks.append(
+            {"type": "tool_use", "id": tc["id"], "name": tc["name"], "input": tc["input"]}
+        )
+    return StreamChunk(
+        ChunkType.DONE,
+        blocks=blocks,
+        tool_calls=list(tool_calls),
+        stop_reason=stop_reason,
+    )
 
 
 def make_config(**overrides) -> SimpleNamespace:

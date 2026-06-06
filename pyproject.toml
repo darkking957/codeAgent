@@ -10,6 +10,7 @@ dependencies = [
     "prompt-toolkit>=3.0.0",
     "pyyaml>=6.0",
     "pydantic>=2",
+    "pathspec>=0.12",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["coreagent*"]
+
+# 随包分发的 ripgrep 二进制（grep 工具依赖；本步仅 linux-x64）。
+[tool.setuptools.package-data]
+coreagent = ["bin/**/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

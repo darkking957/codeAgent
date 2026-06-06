@@ -35,6 +35,27 @@ class Conversation:
         else:
             self.messages.append({"role": "assistant", "content": text})
 
+    def add_assistant_blocks(self, blocks: list) -> None:
+        """追加 assistant 内容块消息（含 tool_use 块，供多轮工具调用回灌）。"""
+        self.messages.append({"role": "assistant", "content": blocks})
+
+    def add_tool_results(self, results: list[dict]) -> None:
+        """追加含 tool_result 块的 user 消息。
+
+        results 每项：{"tool_use_id", "content", "is_error"(可选)}。
+        """
+        content: list[dict] = []
+        for r in results:
+            block: dict = {
+                "type": "tool_result",
+                "tool_use_id": r["tool_use_id"],
+                "content": r["content"],
+            }
+            if r.get("is_error"):
+                block["is_error"] = True
+            content.append(block)
+        self.messages.append({"role": "user", "content": content})
+
     def clear(self) -> None:
         self.messages.clear()
 

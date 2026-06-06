@@ -1,4 +1,6 @@
 import asyncio
+import json
+import signal
 import sys
 from pathlib import Path
 
@@ -15,8 +17,15 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
+from coreagent import confirm_ui
+from coreagent.agent import (
+    EXIT_CANCELLED,
+    EXIT_CAP,
+    run_agent_turn,
+)
+from coreagent.prompts import build_system_prompt
 from coreagent.providers.base import ChunkType
-from coreagent.retry import stream_with_retry
+from coreagent.tools import build_registry
 
 # ── ANSI codes for token-by-token streaming ────────────────────────────────────
 _AI      = "\033[96m"      # bright cyan  – ◆ model header
@@ -83,12 +92,18 @@ _STYLE = Style.from_dict({
 
 _HISTORY_PATH = Path("~/.config/coreagent/prompt_history").expanduser()
 
+# 主输入框提示符。注意：prompt_toolkit 的 `prompt_async(message=...)` 会执行
+# `self.message = message`，永久改写共享 session 的提示符——confirm / plan 复用同一
+# session 传了自己的 message 后会污染主输入框。故主循环每次显式传回本常量复位。
+_PROMPT_MSG = FormattedText([("class:prompt", " ◇  ")])
+
 
 # ── /command completer ─────────────────────────────────────────────────────────
 class _CommandCompleter(Completer):
     _CMDS = {
         "/help":  "show commands",
         "/clear": "clear history",
+        "/plan":  "toggle plan-only (只规划、不执行写操作)",
         "/exit":  "quit",
         "/quit":  "quit",
     }
@@ -123,10 +138,26 @@ async def _run_spinner(stop: asyncio.Event) -> None:
 
 # ── TUI ────────────────────────────────────────────────────────────────────────
 class TUI:
-    def __init__(self, provider, config, conversation):
+    def __init__(self, provider, config, conversation, registry=None, system_prompt=None,
+                 env_block=None):
         self.provider = provider
         self.config = config
         self.conversation = conversation
+        # 工具注册中心与系统提示词由 main 注入；缺省时自建，便于测试构造。
+        self.registry = registry if registry is not None else build_registry()
+        self.system_prompt = (
+            system_prompt
+            if system_prompt is not None
+            else build_system_prompt(self.registry.names())
+        )
+        # 环境块（带 <env> 标签）由 main 启动时快照一次注入；缺省 None 时不注入。
+        self.env_block = env_block
+        self._in_thinking = False
+        # plan-only 开关：开启时写类工具被拦截记为计划项、不落盘（见 /plan）。
+        self.plan_only = False
+        # 本会话信任集（#0005）：选「同意且不再询问」后按工具名记住，仅本会话内存、不落盘；
+        # 之后该工具的写操作直接放行、不再弹菜单。
+        self._trusted: set[str] = set()
         self.console = Console(
             markup=True,
             highlight=False,
@@ -162,6 +193,11 @@ class TUI:
                     ("class:bottom-toolbar.sep",  "  │"),
                     ("class:bottom-toolbar.info", "  ◈"),
                 ]
+            if self.plan_only:
+                parts += [
+                    ("class:bottom-toolbar.sep",   "  │"),
+                    ("class:bottom-toolbar.brand", "  ⏸ plan"),
+                ]
             parts += [
                 ("class:bottom-toolbar.sep",  "  │"),
                 ("class:bottom-toolbar.hint", "  Tab  ↑↓  /help "),
@@ -169,7 +205,7 @@ class TUI:
             return FormattedText(parts)
 
         self.session = PromptSession(
-            message=FormattedText([("class:prompt", " ◇  ")]),
+            message=_PROMPT_MSG,
             style=_STYLE,
             history=history,
             auto_suggest=AutoSuggestFromHistory(),
@@ -240,6 +276,132 @@ class TUI:
         sys.stdout.write(f"\n第 {attempt} 次重试（{wait}s 后）…\n")
         sys.stdout.flush()
 
+    def _rollback_pending_user(self) -> None:
+        """流式失败 / 中断时回滚末条「纯文本 user 提问」，不污染历史。
+
+        仅当末条是字符串内容的 user 消息（即本回合尚未进入工具阶段）才回滚；
+        若已是 tool_result（list 内容）则保留，避免留下悬挂的 tool_use 块。
+        """
+        msgs = self.conversation.messages
+        if msgs and msgs[-1]["role"] == "user" and isinstance(msgs[-1]["content"], str):
+            msgs.pop()
+
+    # ── streaming chunk render ───────────────────────────────────────────────────
+
+    def _render_chunk(self, chunk) -> None:
+        """渲染一个流式 chunk；thinking / text / done 纯对话路径行为不变，循环级信号只在多轮可见。"""
+        if chunk.type == ChunkType.THINKING:
+            if not self._in_thinking:
+                sys.stdout.write(f" {_TH_HDR}◈  thinking{_RST}\n{_TH_BODY}")
+                self._in_thinking = True
+            sys.stdout.write(chunk.content)
+            sys.stdout.flush()
+        elif chunk.type == ChunkType.TEXT:
+            if self._in_thinking:
+                sys.stdout.write(f"{_RST}\n")
+                self._in_thinking = False
+            sys.stdout.write(chunk.content)
+            sys.stdout.flush()
+        elif chunk.type == ChunkType.DONE:
+            if self._in_thinking:
+                sys.stdout.write(_RST)
+                self._in_thinking = False
+            sys.stdout.write("\n\n")
+            sys.stdout.flush()
+        elif chunk.type == ChunkType.TURN_START:
+            # 第 2 轮起显示分组分隔行；单轮纯对话不显示（与 #0003 视觉一致）。
+            if chunk.round_index and chunk.round_index >= 2:
+                self.console.print(f"[dim]─── 第 {chunk.round_index} 轮 ───[/dim]")
+        elif chunk.type == ChunkType.TURN_END:
+            pass  # 轮结束无独立可见渲染（stop_reason 仅供上层感知）
+        elif chunk.type == ChunkType.LOOP_DONE:
+            if chunk.exit_reason == EXIT_CAP:
+                self.console.print("  [yellow]●[/yellow]  [dim]已达上限，停止继续调用[/dim]")
+            elif chunk.exit_reason == EXIT_CANCELLED:
+                self.console.print("  [dim]已取消[/dim]")
+            # EXIT_NATURAL：不额外渲染。
+        elif chunk.type == ChunkType.LOOP_ERROR:
+            self.console.print(f"  [red]✗[/red]  [dim]循环错误：{chunk.error_type}[/dim]")
+
+    # ── tool call / result render ────────────────────────────────────────────────
+
+    def _render_tool(self, phase: str, tool_call: dict, result=None) -> None:
+        """以紧凑形式展示工具调用与结果。"""
+        name = tool_call.get("name", "?")
+        if phase == "call":
+            try:
+                args = json.dumps(tool_call.get("input", {}), ensure_ascii=False)
+            except (TypeError, ValueError):
+                args = str(tool_call.get("input", {}))
+            if len(args) > 120:
+                args = args[:117] + "…"
+            self.console.print(f"  [cyan]⚙[/cyan]  [bold]{name}[/bold] [dim]{args}[/dim]")
+        elif phase == "rejected":
+            self.console.print(f"  [red]✗[/red]  [dim]已拒绝执行 {name}[/dim]")
+        elif phase == "result" and result is not None:
+            mark = "[green]✓[/green]" if result.success else "[red]✗[/red]"
+            first = result.content.splitlines()[0] if result.content else ""
+            if len(first) > 100:
+                first = first[:97] + "…"
+            extra = ""
+            line_count = result.content.count("\n") + 1 if result.content else 0
+            if line_count > 1:
+                extra = f" [dim](+{line_count - 1} 行)[/dim]"
+            self.console.print(f"  {mark}  [dim]{first}[/dim]{extra}")
+
+    # ── execute-time confirmation ────────────────────────────────────────────────
+
+    async def _confirm(self, tool_call: dict) -> bool:
+        """写类工具执行前的用户确认（#0005 富交互菜单）；三态收敛为二态回传循环。
+
+        流程：非 TTY → 纯文本 y/N 降级（不记忆）；工具名已在本会话信任集 → 直接同意（不弹菜单）；
+        否则弹内联富菜单。选「同意且不再询问」→ 把工具名加入信任集后回传同意。循环侧只见 bool。
+
+        不复用主 session（避免再污染 self.message）；富菜单渲染 / 交互全在 confirm_ui 内收敛。
+        """
+        name = tool_call.get("name", "?")
+        # 非 TTY（管道 / 重定向 / CI）→ 纯文本降级，不渲染富 UI、不记忆。
+        if not confirm_ui.is_interactive():
+            return await confirm_ui.confirm_plain(name)
+        # 本会话已信任该工具 → 直接放行。
+        if name in self._trusted:
+            return True
+        preview = confirm_ui.build_preview(tool_call)
+        try:
+            decision = await confirm_ui.confirm_interactive(preview)
+        except (EOFError, KeyboardInterrupt):
+            return False
+        if decision == confirm_ui.APPROVE_ALWAYS:
+            self._trusted.add(name)   # 按名记住（内存、不落盘）
+            return True
+        return decision == confirm_ui.APPROVE
+
+    async def _review_plan(self, plan: list) -> None:
+        """plan-only 循环结束后展示计划列表并征求确认；确认即退出 plan-only（不自动执行）。"""
+        self.console.print()
+        self.console.print("  [bold]待执行计划：[/bold]")
+        for i, item in enumerate(plan, 1):
+            self.console.print(f"    [cyan]{i}.[/cyan] [dim]{item.get('text', item.get('name', '?'))}[/dim]")
+        try:
+            ans = await self.session.prompt_async(
+                message=FormattedText([
+                    ("class:prompt", "  确认计划并退出 plan-only？[y/N] "),
+                ]),
+            )
+        except (EOFError, KeyboardInterrupt):
+            ans = ""
+        if ans.strip().lower() in ("y", "yes"):
+            self.plan_only = False
+            self.console.print("  [dim]已退出 plan-only 模式[/dim]")
+        else:
+            self.console.print("  [dim]仍在 plan-only 模式；下一条输入仍只规划[/dim]")
+
+    async def _stop_spinner(self, stop_spin: asyncio.Event, spin: asyncio.Task) -> None:
+        """停掉等待 spinner（幂等）：首个可见输出前调用。"""
+        if not stop_spin.is_set():
+            stop_spin.set()
+            await spin
+
     # ── main loop ──────────────────────────────────────────────────────────────
 
     async def run(self) -> None:
@@ -247,7 +409,9 @@ class TUI:
 
         while True:
             try:
-                user_input = await self.session.prompt_async()
+                # 显式传回主提示符：confirm / plan 复用同一 session 会把 self.message
+                # 改成它们的临时文案，不复位则主输入框会残留「⚠ 执行…? [y/N]」。
+                user_input = await self.session.prompt_async(message=_PROMPT_MSG)
             except KeyboardInterrupt:
                 print()
                 continue
@@ -275,87 +439,93 @@ class TUI:
                 self._print_help()
                 continue
 
+            if user_input == "/plan":
+                self.plan_only = not self.plan_only
+                if self.plan_only:
+                    self.console.print("  [dim]已进入 plan-only 模式（只规划、不执行写操作）[/dim]")
+                else:
+                    self.console.print("  [dim]已退出 plan-only 模式[/dim]")
+                continue
+
             self.conversation.add_user(user_input)
 
             # ── spinner while waiting for the first token ──────────────────────
             stop_spin = asyncio.Event()
             spin = asyncio.create_task(_run_spinner(stop_spin))
 
-            text_parts: list[str] = []
-            think_parts: list[str] = []
-            final_blocks = None
-            in_thinking = False
-            first_token = False
+            self._in_thinking = False
+            header_printed = False
+            plan_from_loop: list | None = None
+
+            # 流式期间把 Ctrl+C 转为「置取消令牌」，让循环优雅收尾（补齐 tool_result、配平历史），
+            # 替代裸 KeyboardInterrupt 冒泡。非 Unix / 无运行 loop 时回落到 KeyboardInterrupt 分支。
+            cancel = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            sigint_installed = False
+            try:
+                loop.add_signal_handler(signal.SIGINT, cancel.set)
+                sigint_installed = True
+            except (NotImplementedError, RuntimeError, ValueError):
+                pass
 
             try:
-                async for chunk in stream_with_retry(
+                # 多轮 Agent Loop：每轮 流式(带工具) → 确认 → 分类执行 → 回灌 → 检查终止条件。
+                # assistant / tool_result 消息由 run_agent_turn 写入会话历史。
+                async for chunk in run_agent_turn(
                     self.provider,
-                    self.conversation.get_messages(),
+                    self.conversation,
+                    self.registry,
+                    self.system_prompt,
+                    env_block=self.env_block,
+                    confirm=self._confirm,
+                    on_tool=self._render_tool,
                     on_retry=self._on_retry,
+                    cancel=cancel,
+                    plan_only=self.plan_only,
                 ):
-                    if not first_token:
-                        stop_spin.set()
-                        await spin
-                        sys.stdout.write(
-                            f"\n {_AI}◆  {self.config.model}{_RST}\n"
-                        )
+                    # 首个「内容」chunk（thinking/text/done）才停 spinner、打印模型抬头——
+                    # 循环级信号瞬时到达，不应提前打断等待动画。
+                    if not header_printed and chunk.type in (
+                        ChunkType.THINKING, ChunkType.TEXT, ChunkType.DONE
+                    ):
+                        await self._stop_spinner(stop_spin, spin)
+                        sys.stdout.write(f"\n {_AI}◆  {self.config.model}{_RST}\n")
                         sys.stdout.flush()
-                        first_token = True
+                        header_printed = True
+                    # 循环收尾 / 错误信号可能在无任何内容 chunk 时到达，渲染前先停 spinner。
+                    if chunk.type in (ChunkType.LOOP_DONE, ChunkType.LOOP_ERROR):
+                        await self._stop_spinner(stop_spin, spin)
+                        if chunk.type == ChunkType.LOOP_DONE and chunk.plan:
+                            plan_from_loop = chunk.plan
 
-                    if chunk.type == ChunkType.THINKING:
-                        if not in_thinking:
-                            sys.stdout.write(
-                                f" {_TH_HDR}◈  thinking{_RST}\n{_TH_BODY}"
-                            )
-                            sys.stdout.flush()
-                            in_thinking = True
-                        sys.stdout.write(chunk.content)
-                        sys.stdout.flush()
-                        think_parts.append(chunk.content)
-
-                    elif chunk.type == ChunkType.TEXT:
-                        if in_thinking:
-                            sys.stdout.write(f"{_RST}\n")
-                            in_thinking = False
-                        sys.stdout.write(chunk.content)
-                        sys.stdout.flush()
-                        text_parts.append(chunk.content)
-
-                    elif chunk.type == ChunkType.DONE:
-                        if in_thinking:
-                            sys.stdout.write(_RST)
-                        sys.stdout.write("\n\n")
-                        sys.stdout.flush()
-                        if chunk.blocks is not None:
-                            final_blocks = chunk.blocks
+                    self._render_chunk(chunk)
 
             except KeyboardInterrupt:
+                # 回落路径（未能装上 SIGINT handler 时）：等价于取消。
                 sys.stdout.write(f"{_RST}\n")
-                self.console.print("  [dim]interrupted[/dim]\n")
-                if (
-                    self.conversation.messages
-                    and self.conversation.messages[-1]["role"] == "user"
-                ):
-                    self.conversation.messages.pop()
+                self.console.print("  [dim]已取消[/dim]\n")
+                self._rollback_pending_user()
                 continue
 
             except Exception as e:
                 sys.stdout.write(f"{_RST}\n")
                 self.console.print(f"  [red]✗[/red]  {e}\n")
-                if (
-                    self.conversation.messages
-                    and self.conversation.messages[-1]["role"] == "user"
-                ):
-                    self.conversation.messages.pop()
+                self._rollback_pending_user()
                 continue
 
             finally:
+                if sigint_installed:
+                    try:
+                        loop.remove_signal_handler(signal.SIGINT)
+                    except (NotImplementedError, RuntimeError, ValueError):
+                        pass
                 if not stop_spin.is_set():
                     stop_spin.set()
                 if not spin.done():
                     await spin
 
-            text = "".join(text_parts)
-            thinking = "".join(think_parts)
-            self.conversation.add_assistant(text, thinking, blocks=final_blocks)
             self.conversation.save()
+
+            # plan-only：循环结束后展示计划列表、征求确认（确认即退出 plan-only，不自动执行）。
+            if self.plan_only and plan_from_loop:
+                await self._review_plan(plan_from_loop)

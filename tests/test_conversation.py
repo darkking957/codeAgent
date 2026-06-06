@@ -21,6 +21,28 @@ def test_roundtrip(tmp_path):
     assert last["content"][1]["type"] == "text"
 
 
+def test_tool_blocks_roundtrip(tmp_path):
+    path = tmp_path / "history.json"
+    conv = Conversation()
+    conv.add_user("读 a.txt")
+    conv.add_assistant_blocks([
+        {"type": "text", "text": "好的"},
+        {"type": "tool_use", "id": "tu_1", "name": "read_file", "input": {"path": "a.txt"}},
+    ])
+    conv.add_tool_results([
+        {"tool_use_id": "tu_1", "content": "hello", "is_error": False},
+    ])
+    conv.add_assistant("文件内容是 hello")
+    conv.save(path)
+
+    loaded = Conversation.load(path)
+    assert loaded.get_messages() == conv.get_messages()  # 往返不丢块
+    # tool_use（assistant）与 tool_result（user）块结构保留
+    assert loaded.messages[1]["content"][1]["type"] == "tool_use"
+    assert loaded.messages[2]["content"][0]["type"] == "tool_result"
+    assert loaded.messages[2]["content"][0]["tool_use_id"] == "tu_1"
+
+
 def test_atomic_no_temp_residue(tmp_path):
     path = tmp_path / "history.json"
     conv = Conversation()

@@ -35,6 +35,8 @@ async def stream_with_retry(
     provider,
     messages,
     *,
+    system: str | list | None = None,
+    tools: list[dict] | None = None,
     max_retries: int = 3,
     on_retry: Callable[[int, int], None] | None = None,
 ) -> AsyncGenerator[StreamChunk, None]:
@@ -43,6 +45,7 @@ async def stream_with_retry(
     - 仅对可重试异常退避：1 / 2 / 4 秒；不可恢复错误立即上抛。
     - 已 yield 过任何 chunk 的尝试若再异常，则不重试、直接上抛（避免重复刷屏）。
     - 重试对用户的可见性经 ``on_retry(attempt, wait)`` 回调注入；诊断走 logging。
+    - ``system`` / ``tools`` 透传给 provider；不传时与纯对话路径行为一致。
     """
     for attempt in range(max_retries + 1):
         if attempt > 0:
@@ -54,7 +57,7 @@ async def stream_with_retry(
 
         yielded = False
         try:
-            async for chunk in provider.stream_chat(messages):
+            async for chunk in provider.stream_chat(messages, system=system, tools=tools):
                 yielded = True
                 yield chunk
             return

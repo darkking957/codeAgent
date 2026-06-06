@@ -6,8 +6,11 @@ import sys
 
 from coreagent.config import load_config
 from coreagent.conversation import Conversation
+from coreagent.environment import build_env_block
 from coreagent.errors import ConfigError
+from coreagent.prompts import build_system_prompt
 from coreagent.providers import create_provider
+from coreagent.tools import build_registry
 from coreagent.tui import TUI
 
 # 日志级别由环境变量控制，默认安静（WARNING），且写 stderr 不污染对话区（stdout）。
@@ -49,6 +52,11 @@ def main() -> None:
         print(str(e))
         sys.exit(1)
 
+    # 注入工具注册中心与系统提示词；环境块在启动时快照一次（git 子进程只调一次），整会话复用。
+    registry = build_registry()
+    system_prompt = build_system_prompt(registry.names())
+    env_block = build_env_block()
+
     conversation = Conversation.load()
-    tui = TUI(provider, config, conversation)
+    tui = TUI(provider, config, conversation, registry, system_prompt, env_block)
     asyncio.run(tui.run())
