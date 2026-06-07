@@ -11,7 +11,7 @@ from coreagent.tools.glob_tool import GlobTool
 from coreagent.tools.grep_tool import GrepTool
 from coreagent.tools.read_file import ReadFileTool
 from coreagent.tools.registry import ToolRegistry
-from coreagent.tools.run_command import DEFAULT_TIMEOUT, RunCommandTool
+from coreagent.tools.run_command import DEFAULT_TIMEOUT, MAX_TIMEOUT, RunCommandTool
 from coreagent.tools.write_file import WriteFileTool
 
 # 固定值（与 checklist 一致）。
@@ -140,19 +140,75 @@ def test_run_command_echo():
     assert "exit_code: 0" in res.content
 
 
-def test_run_command_default_timeout_is_30():
-    # 默认超时 30 秒；超时文案据此模板生成。
-    assert DEFAULT_TIMEOUT == 30
-    assert RunCommandTool().timeout == 30
-    # 验证模板文案在 30s 下精确为「超过 30 秒」（不真等 30s）。
-    expected = f"命令执行超时（超过 {RunCommandTool().timeout} 秒）"
-    assert expected == "命令执行超时（超过 30 秒）"
+def test_run_command_default_and_max_timeout():
+    # 默认超时调大到 120 秒（构建/测试留余量）；硬上限 600 秒。
+    assert DEFAULT_TIMEOUT == 120
+    assert MAX_TIMEOUT == 600
+    assert RunCommandTool().timeout == 120
 
 
 def test_run_command_timeout_message():
     res = RunCommandTool(timeout=1).execute({"command": "sleep 5"})
     assert res.success is False
     assert res.content == "命令执行超时（超过 1 秒）"
+
+
+def test_run_command_timeout_returns_promptly():
+    # 回归：超时后须就近返回（kill 整组 → reader 线程读到 EOF → 收尾不卡死）。
+    # sleep 10 + timeout=1 应在约 1s 返回，远小于命令本身 10s（给 5s 宽容上限）。
+    import time
+    t0 = time.monotonic()
+    res = RunCommandTool(timeout=1).execute({"command": "sleep 10"})
+    elapsed = time.monotonic() - t0
+    assert res.success is False
+    assert res.content == "命令执行超时（超过 1 秒）"
+    assert elapsed < 5, f"超时返回耗时 {elapsed:.1f}s，疑似收尾卡死"
+
+
+def test_run_command_per_call_timeout_overrides_default():
+    # 模型经 timeout 参数为单条命令放宽/收紧超时：生效值即 _resolve_timeout 结果，
+    # 超时文案据生效值生成（这里传 1，sleep 5 必超时，文案为「超过 1 秒」）。
+    res = RunCommandTool(timeout=120).execute({"command": "sleep 5", "timeout": 1})
+    assert res.success is False
+    assert res.content == "命令执行超时（超过 1 秒）"
+
+
+def test_run_command_timeout_resolution_rules():
+    # 缺省 → 回落实例默认；合法 → 采用；超上限 → 夹到 MAX_TIMEOUT；非法/<=0 → 回落默认。
+    t = RunCommandTool(timeout=120)
+    assert t._resolve_timeout({}) == 120
+    assert t._resolve_timeout({"timeout": 300}) == 300
+    assert t._resolve_timeout({"timeout": 9999}) == MAX_TIMEOUT
+    assert t._resolve_timeout({"timeout": 0}) == 120
+    assert t._resolve_timeout({"timeout": -5}) == 120
+    assert t._resolve_timeout({"timeout": "abc"}) == 120
+
+
+def test_run_command_exposes_timeout_param():
+    # API 工具清单暴露可选 timeout 参数，且 command 仍为唯一必填。
+    schema = RunCommandTool().parameters
+    assert "timeout" in schema["properties"]
+    assert schema["properties"]["timeout"]["type"] == "integer"
+    assert schema["required"] == ["command"]
+
+
+def test_run_command_live_echo_writer_receives_output_and_completion():
+    # 注入 writer 后，运行期间逐行回显 + 收尾行（含用时）都送达 sink；不影响回灌结果。
+    lines: list[str] = []
+    t = RunCommandTool(writer=lines.append)
+    res = t.execute({"command": "printf 'a\\nb\\n'"})
+    assert res.success
+    assert "a" in lines and "b" in lines           # 输出逐行回显
+    assert any(s.startswith("✓ 完成") for s in lines)  # 收尾行带退出码 + 用时
+    assert "exit_code: 0" in res.content            # 回灌格式不变
+
+
+def test_run_command_writer_none_is_silent_and_default():
+    # 默认不注入 writer：保持安静（无回显副作用），行为与旧版一致。
+    t = RunCommandTool()
+    assert t._writer is None
+    res = t.execute({"command": "echo hi"})
+    assert res.success and "hi" in res.content
 
 
 # ── glob ──────────────────────────────────────────────────────────────────────

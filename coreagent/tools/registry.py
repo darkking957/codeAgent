@@ -5,8 +5,9 @@
 - 统一执行：按名分派；整体超时守卫 + 捕获任意异常 → 结构化失败结果（不上抛、不崩溃）。
 
 整体超时守卫说明：execute 把同步工具丢到线程跑并 `wait_for`，既不阻塞事件循环，
-又给「忽略自身超时而挂死的工具」兜底。默认 60s 大于 run_command 自身 30s，
-故 run_command 会先以自己的精确文案超时返回，不被这里的兜底抢先。
+又给「忽略自身超时而挂死的工具」兜底。守卫值须大于任何工具自身超时——故大于
+run_command 的硬上限 MAX_TIMEOUT（600s），保证 run_command 总以自己的精确文案超时
+返回（含模型经 timeout 放宽到上限的情形），不被这里的兜底抢先。
 """
 
 import asyncio
@@ -16,8 +17,9 @@ from coreagent.tools.base import Tool, ToolResult
 
 logger = logging.getLogger(__name__)
 
-# 整体超时守卫（秒）：兜底用，须大于任何工具自身超时。
-DEFAULT_TIMEOUT = 60.0
+# 整体超时守卫（秒）：兜底用，须大于任何工具自身超时——含 run_command 的硬上限 600s，
+# 故取 660s（留 60s 余量），让 run_command 永远先以自己的精确文案超时返回。
+DEFAULT_TIMEOUT = 660.0
 
 
 class ToolRegistry:
