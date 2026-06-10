@@ -1,0 +1,64 @@
+# CoreAgent Web 生产部署（信任好友 / 公网域名 codelabrory.com）。
+#
+# 自包含：`docker compose -f docker-compose.prod.yml up -d` 起 db + app + caddy（不与 dev 版 merge）。
+# 与 docker-compose.yml（dev）区别：
+#   - app 不直接对外，只经内网给 caddy（外网入口只有 caddy 的 80/443）。
+#   - caddy 反代 + 自动 HTTPS + basic_auth 前门（见 Caddyfile）。
+#   - COOKIE_SECURE=1（https 下 Cookie 带 Secure）。
+#   - DEV=1：验证码自助回带（注册免接真短信）——安全前提是「前门已被 caddy basic_auth 挡住」。
+#
+# 机密不写死在此：DB 口令 / provider 密钥经 .env（gitignore）注入 → 本文件可安全入库、随仓库分发。
+# 另一台服务器：拉取 → cp .env.example .env 并填 → docker compose -f docker-compose.prod.yml up -d。
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: coreagent
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
+      POSTGRES_DB: coreagent
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coreagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # postgresql:// 开头 → store.build_store 选 PostgresStore。DB 口令为纯 hex，URL 直接拼、无需转义。
+      COREAGENT_WEB_DB_URL: "postgresql://coreagent:${POSTGRES_PASSWORD}@db:5432/coreagent"
+      COREAGENT_WEB_WORKSPACE: /data/workspaces
+      COREAGENT_CONFIG: /app/config.yaml
+      # provider 密钥：由 .env / host 注入，供 config.yaml 里的 ${ANTHROPIC_API_KEY} 解析。
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      COREAGENT_WEB_DEV: "1"          # 仅因前门有 caddy basic_auth 才安全（陌生人到不了这里）
+      COREAGENT_COOKIE_SECURE: "1"    # https 部署：会话 Cookie 带 Secure
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro   # provider 密钥
+      - wsdata:/data/workspaces
+    security_opt:
+      - seccomp:unconfined                  # 让 bubblewrap 能 unshare（沙箱）；否则子进程工具 fail-closed
+    # 注意：故意不写 ports —— app 只在 compose 内网可达（caddy 经 app:8000 访问），外网到不了。
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - app
+    ports:
+      - "80:80"     # ACME HTTP 校验 + http→https 跳转
+      - "443:443"   # HTTPS
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # 证书 / ACME 账号（持久化，避免重签触发限流）
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  wsdata:
+  caddy_data:
+  caddy_config:

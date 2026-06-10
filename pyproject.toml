@@ -1,0 +1,54 @@
+[project]
+name = "coreagent"
+version = "0.1.0"
+description = "Command-line AI assistant"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.43.0",
+    "openai>=1.0.0",
+    "rich>=13.0.0",
+    "prompt-toolkit>=3.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2",
+    "pathspec>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+coreagent = "coreagent.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["coreagent*"]
+
+# 随包分发的 ripgrep 二进制（grep 工具依赖；本步仅 linux-x64）。
+[tool.setuptools.package-data]
+coreagent = ["bin/**/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+# tui.py 的 ANSI/banner 排版含对齐用长行，放宽行宽限制。
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
