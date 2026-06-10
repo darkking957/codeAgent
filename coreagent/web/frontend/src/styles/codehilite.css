@@ -1,0 +1,133 @@
+/* pygments 代码高亮容器 + token 配色（容器 class = `codehilite`，由后端 render.py 产出）。
+ * 亮暗两套 token 配色（#0026 T10）：暗色下代码块须可读。随服务端 HTML 注入，不取 CDN。 */
+
+.codehilite {
+  background: var(--code-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  overflow: auto;
+  margin: 0.8em 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.codehilite pre {
+  margin: 0;
+  background: none;
+  padding: 0;
+  white-space: pre;
+  font-family: var(--font-mono);
+}
+
+/* —— 亮色 token 配色（pygments 默认调色板的暖白适配）—— */
+:root[data-theme="light"] .codehilite .c,
+:root[data-theme="light"] .codehilite .c1,
+:root[data-theme="light"] .codehilite .cm,
+:root[data-theme="light"] .codehilite .cs {
+  color: #6a737d;
+  font-style: italic;
+}
+:root[data-theme="light"] .codehilite .k,
+:root[data-theme="light"] .codehilite .kc,
+:root[data-theme="light"] .codehilite .kd,
+:root[data-theme="light"] .codehilite .kn,
+:root[data-theme="light"] .codehilite .kr {
+  color: #cf222e;
+  font-weight: 600;
+}
+:root[data-theme="light"] .codehilite .kt {
+  color: #b00040;
+}
+:root[data-theme="light"] .codehilite .o,
+:root[data-theme="light"] .codehilite .ow {
+  color: #5c5a57;
+}
+:root[data-theme="light"] .codehilite .nb,
+:root[data-theme="light"] .codehilite .bp {
+  color: #0550ae;
+}
+:root[data-theme="light"] .codehilite .nf,
+:root[data-theme="light"] .codehilite .fm,
+:root[data-theme="light"] .codehilite .nc,
+:root[data-theme="light"] .codehilite .nn {
+  color: #8250df;
+}
+:root[data-theme="light"] .codehilite .s,
+:root[data-theme="light"] .codehilite .s1,
+:root[data-theme="light"] .codehilite .s2,
+:root[data-theme="light"] .codehilite .sb,
+:root[data-theme="light"] .codehilite .sd,
+:root[data-theme="light"] .codehilite .se {
+  color: #0a7d33;
+}
+:root[data-theme="light"] .codehilite .m,
+:root[data-theme="light"] .codehilite .mi,
+:root[data-theme="light"] .codehilite .mf,
+:root[data-theme="light"] .codehilite .mh {
+  color: #0550ae;
+}
+:root[data-theme="light"] .codehilite .nd {
+  color: #8250df;
+}
+:root[data-theme="light"] .codehilite .nv,
+:root[data-theme="light"] .codehilite .vi {
+  color: #953800;
+}
+
+/* —— 暗色 token 配色（高对比，深底可读）—— */
+:root[data-theme="dark"] .codehilite {
+  color: #e6e1dc;
+}
+:root[data-theme="dark"] .codehilite .c,
+:root[data-theme="dark"] .codehilite .c1,
+:root[data-theme="dark"] .codehilite .cm,
+:root[data-theme="dark"] .codehilite .cs {
+  color: #8b949e;
+  font-style: italic;
+}
+:root[data-theme="dark"] .codehilite .k,
+:root[data-theme="dark"] .codehilite .kc,
+:root[data-theme="dark"] .codehilite .kd,
+:root[data-theme="dark"] .codehilite .kn,
+:root[data-theme="dark"] .codehilite .kr {
+  color: #ff7b72;
+  font-weight: 600;
+}
+:root[data-theme="dark"] .codehilite .kt {
+  color: #ff9492;
+}
+:root[data-theme="dark"] .codehilite .o,
+:root[data-theme="dark"] .codehilite .ow {
+  color: #b8b6b0;
+}
+:root[data-theme="dark"] .codehilite .nb,
+:root[data-theme="dark"] .codehilite .bp {
+  color: #79c0ff;
+}
+:root[data-theme="dark"] .codehilite .nf,
+:root[data-theme="dark"] .codehilite .fm,
+:root[data-theme="dark"] .codehilite .nc,
+:root[data-theme="dark"] .codehilite .nn {
+  color: #d2a8ff;
+}
+:root[data-theme="dark"] .codehilite .s,
+:root[data-theme="dark"] .codehilite .s1,
+:root[data-theme="dark"] .codehilite .s2,
+:root[data-theme="dark"] .codehilite .sb,
+:root[data-theme="dark"] .codehilite .sd,
+:root[data-theme="dark"] .codehilite .se {
+  color: #a5d6ff;
+}
+:root[data-theme="dark"] .codehilite .m,
+:root[data-theme="dark"] .codehilite .mi,
+:root[data-theme="dark"] .codehilite .mf,
+:root[data-theme="dark"] .codehilite .mh {
+  color: #79c0ff;
+}
+:root[data-theme="dark"] .codehilite .nd {
+  color: #d2a8ff;
+}
+:root[data-theme="dark"] .codehilite .nv,
+:root[data-theme="dark"] .codehilite .vi {
+  color: #ffa657;
+}

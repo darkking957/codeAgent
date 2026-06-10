@@ -1,0 +1,47 @@
+# CoreAgent Web 全栈（#0025）：一条 `docker compose up` 起 app + Postgres。
+#
+# 数据落卷：会话 / 用户 / 用量在 Postgres（pgdata 卷），每用户 workspace 在 wsdata 卷——删容器再起，
+# 数据仍在。app 经 COREAGENT_WEB_DB_URL 走 Postgres 后端（store.build_store 据此选后端）。
+#
+# 沙箱：app 容器需用户命名空间能力让 bubblewrap 能 `unshare`。security_opt: seccomp:unconfined 放开
+# 被默认 seccomp 拦的 unshare 类系统调用；若宿主仍不允许无特权 userns，沙箱探测不可用即 fail-closed
+# （run_command/grep 拒绝执行），安全不退化。需真沙箱时可加 `privileged: true`（按部署环境权衡）。
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: coreagent
+      POSTGRES_PASSWORD: coreagent
+      POSTGRES_DB: coreagent
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coreagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # postgres 后端（以 postgres 开头 → store.build_store 选 PostgresStore）。
+      COREAGENT_WEB_DB_URL: postgresql://coreagent:coreagent@db:5432/coreagent
+      COREAGENT_WEB_WORKSPACE: /data/workspaces
+      COREAGENT_CONFIG: /app/config.yaml
+      # dev 发码回带验证码（生产真实短信接入后置 0）；https 部署置 COOKIE_SECURE=1。
+      COREAGENT_WEB_DEV: "1"
+      COREAGENT_COOKIE_SECURE: "0"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro   # provider 密钥（DeepSeek 的 Anthropic 端点等）
+      - wsdata:/data/workspaces
+    security_opt:
+      - seccomp:unconfined                  # 让 bubblewrap 能 unshare（沙箱）；否则 fail-closed
+
+volumes:
+  pgdata:
+  wsdata:

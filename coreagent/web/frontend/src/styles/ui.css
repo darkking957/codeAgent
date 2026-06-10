@@ -1,0 +1,201 @@
+/* 通用 UI 组件（图标按钮 / 按钮 / 模态 / 菜单 / 打字指示）。 */
+
+/* —— 图标按钮（reference §6.1）—— */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: background var(--t-hover) ease, color var(--t-hover) ease;
+}
+.icon-btn--sm {
+  width: 28px;
+  height: 28px;
+}
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.icon-btn:active {
+  background: var(--bg-active);
+}
+.icon-btn.is-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: none;
+}
+
+/* —— 文本按钮 —— */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--t-hover) ease, border-color var(--t-hover) ease;
+}
+.btn:hover {
+  background: var(--bg-hover);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.btn--primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+.btn--ghost {
+  background: transparent;
+}
+.btn--danger {
+  color: #c0392b;
+  border-color: color-mix(in srgb, #c0392b 35%, var(--border-default));
+}
+:root[data-theme="dark"] .btn--danger {
+  color: #ff8a7a;
+}
+.btn--danger:hover {
+  background: color-mix(in srgb, #c0392b 10%, transparent);
+}
+
+/* —— 模态浮层 —— */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fade-in 120ms ease;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.modal-box {
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  max-width: min(720px, 92vw);
+  max-height: 84vh;
+  overflow: auto;
+  padding: 22px;
+  box-shadow: var(--shadow-popover);
+  animation: pop-in 150ms ease-out;
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.modal-title {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* —— 下拉菜单（账户 / 会话操作）—— */
+.menu {
+  position: absolute;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  padding: 4px;
+  min-width: 168px;
+  z-index: 70;
+  animation: pop-in 150ms ease-out;
+}
+.menu--recent {
+  top: 30px;
+  right: 6px;
+}
+.menu--user {
+  bottom: 56px;
+  left: 12px;
+  right: 12px;
+}
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background var(--t-hover) ease;
+}
+.menu__item:hover {
+  background: var(--bg-hover);
+}
+.menu__item--danger {
+  color: #c0392b;
+}
+:root[data-theme="dark"] .menu__item--danger {
+  color: #ff8a7a;
+}
+
+/* —— 流式打字指示 —— */
+.typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px 0;
+}
+.typing-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typing 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}

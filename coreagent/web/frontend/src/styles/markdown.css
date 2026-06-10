@@ -1,0 +1,121 @@
+/* assistant 富渲染排版（#0026 T10）：后端净化 HTML 注入 `.bubble` 后的样式。
+ * 亮暗主题对齐（消费 token）；流式 live 阶段用 `.bubble.raw` 纯文本（pre-wrap，不当 Markdown）。 */
+
+.bubble {
+  white-space: normal;
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--text-primary);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.bubble.raw {
+  white-space: pre-wrap; /* 流式增量：原始文本，不解析 Markdown */
+}
+
+.bubble > :first-child {
+  margin-top: 0;
+}
+.bubble > :last-child {
+  margin-bottom: 0;
+}
+
+.bubble h1,
+.bubble h2,
+.bubble h3,
+.bubble h4,
+.bubble h5,
+.bubble h6 {
+  margin: 1.1em 0 0.5em;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.bubble h1 {
+  font-size: 1.5em;
+}
+.bubble h2 {
+  font-size: 1.3em;
+}
+.bubble h3 {
+  font-size: 1.15em;
+}
+.bubble h4 {
+  font-size: 1em;
+}
+
+.bubble p {
+  margin: 0.7em 0;
+}
+
+.bubble ul,
+.bubble ol {
+  margin: 0.7em 0;
+  padding-left: 1.6em;
+}
+.bubble li {
+  margin: 0.25em 0;
+}
+.bubble li > ul,
+.bubble li > ol {
+  margin: 0.25em 0;
+}
+
+.bubble blockquote {
+  margin: 0.8em 0;
+  padding: 0.2em 1em;
+  border-left: 3px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.bubble hr {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin: 1.2em 0;
+}
+
+.bubble a {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.bubble a:hover {
+  color: var(--accent);
+}
+
+/* 行内代码 */
+.bubble code {
+  background: var(--inline-code-bg);
+  border-radius: 4px;
+  padding: 0.12em 0.36em;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+.bubble pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.bubble table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 0.95em;
+  display: block;
+  overflow-x: auto;
+}
+.bubble th,
+.bubble td {
+  border: 1px solid var(--border-default);
+  padding: 5px 10px;
+  text-align: left;
+}
+.bubble th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.bubble img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}

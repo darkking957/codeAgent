@@ -1,0 +1,26 @@
+/* 细窄滚动条（reference §8）：半透明、悬停加深；侧栏 / 消息区 / 文件树共用 `.scroll-area`。 */
+
+.scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+.scroll-area::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-area::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.scroll-area:hover::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb-hover);
+}

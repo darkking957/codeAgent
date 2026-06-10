@@ -1,0 +1,132 @@
+/* 设计 token（#0026 ground truth = reference-home-spec.md §2/§3/§4）。
+ * 亮/暗主题切换只改本文件的 token 值（data-theme 选择器），组件 CSS 一律消费变量。 */
+
+:root,
+:root[data-theme="light"] {
+  /* —— 背景 —— */
+  --bg-main: #f8f8f6; /* 主画布 / 右侧聊天区 */
+  --bg-sidebar: #f5f4ef; /* 侧栏，比主背景略暖 */
+  --bg-elevated: #ffffff; /* 输入框内部 / 浮层卡片 */
+  --bg-hover: #edece6; /* 导航项 / 列表项 hover */
+  --bg-active: #e8e5df; /* 选中态（New chat 高亮胶囊） */
+  --bg-overlay: rgba(0, 0, 0, 0.4); /* 抽屉 / 模态遮罩 */
+
+  /* —— 描边 / 分隔 —— */
+  --border-default: #e2e2e0; /* 输入框 / chip 描边 */
+  --border-divider: #d6d6d4; /* 侧栏与主区之间的发丝竖线 */
+  --border-hairline: #e8e4e1; /* 暖色细分隔 */
+
+  /* —— 文字 —— */
+  --text-primary: #1f1e1d; /* 主文字 / 字标 / 欢迎语 */
+  --text-secondary: #5c5a57; /* 模型选择器 / 次级文字 */
+  --text-muted: #8a8a86; /* 分区标题 Products/Recents */
+  --text-placeholder: #9b9a96; /* 输入框占位符 */
+
+  /* —— 品牌强调色（赤陶 / 珊瑚）—— */
+  --accent: #d97757; /* 标准 Claude clay；星标 logo / 强调 */
+  --accent-strong: #c96442; /* 加深，用于主按钮 hover */
+  --accent-render: #e67150; /* 截图星标渲染色，仅参考 */
+  --on-accent: #ffffff;
+
+  /* —— 头像 —— */
+  --avatar-bg: #1f1e1d;
+  --avatar-text: #ffffff;
+  --dot-notify: #3b82f6; /* 用户档案右上小蓝点 */
+
+  /* 焦点环（基于 accent 的半透明） */
+  --focus-ring: rgba(217, 119, 87, 0.4);
+
+  /* —— 代码块（codehilite 容器底）—— */
+  --code-bg: #f6f8fa;
+  --inline-code-bg: #eff1f3;
+
+  /* 滚动条 thumb（亮色） */
+  --scroll-thumb: rgba(0, 0, 0, 0.15);
+  --scroll-thumb-hover: rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme="dark"] {
+  /* 暗色：bg 进深色系（#262624 / #1F1E1D），文字反相，accent 不变。 */
+  --bg-main: #262624;
+  --bg-sidebar: #1f1e1d;
+  --bg-elevated: #30302e;
+  --bg-hover: #3a3a37;
+  --bg-active: #44423e;
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+
+  --border-default: #444340;
+  --border-divider: #3a3a37;
+  --border-hairline: #3a3a37;
+
+  --text-primary: #f5f4ef;
+  --text-secondary: #b8b6b0;
+  --text-muted: #8a8a86;
+  --text-placeholder: #7c7b77;
+
+  --accent: #d97757; /* accent 不随主题变 */
+  --accent-strong: #e08161;
+  --accent-render: #e67150;
+  --on-accent: #ffffff;
+
+  --avatar-bg: #f5f4ef;
+  --avatar-text: #1f1e1d;
+  --dot-notify: #3b82f6;
+
+  --focus-ring: rgba(217, 119, 87, 0.5);
+
+  --code-bg: #1b1b19;
+  --inline-code-bg: #3a3a37;
+
+  --scroll-thumb: rgba(255, 255, 255, 0.16);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.28);
+}
+
+:root {
+  /* —— 字体（衬线展示体 / 人文无衬线，务必区分两套）—— */
+  --font-serif: "Copernicus", "Tiempos Headline", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "Styrene B", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* —— 圆角 —— */
+  --radius-sm: 6px; /* 小图标按钮 */
+  --radius-md: 8px; /* 导航项 / 最近项 hover 背景 */
+  --radius-lg: 10px; /* 快捷动作 chip */
+  --radius-xl: 24px; /* 输入框（大圆角矩形） */
+  --radius-pill: 9999px; /* 头像 / 胶囊 */
+
+  /* —— 阴影 —— */
+  --shadow-composer: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border-default);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--border-default);
+
+  /* —— 间距（4px 基准）—— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* —— 布局尺寸 —— */
+  --sidebar-width: 272px;
+  --content-max: 768px;
+
+  /* —— 过渡时长（reference §7）—— */
+  --t-sidebar: 200ms;
+  --t-hover: 150ms;
+  --t-focus: 120ms;
+}
+
+/* 尊重「减少动效」：关闭所有非必要过渡 / 动画（reference §7/§10）。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

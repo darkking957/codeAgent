@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CoreAgent</title>
+    <meta name="description" content="CoreAgent — a Claude-style coding assistant." />
+    <!-- 主题闪烁防护：渲染前据持久化选择 / 系统偏好设置 data-theme（详见 src/theme.ts）。 -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("coreagent-theme");
+          var sys = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", saved === "light" || saved === "dark" ? saved : sys);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

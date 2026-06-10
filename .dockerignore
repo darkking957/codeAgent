@@ -1,0 +1,9 @@
+# 构建上下文瘦身：前端依赖 / 产物在 Docker 内重建（见 Dockerfile frontend 阶段），不入上下文。
+coreagent/web/frontend/node_modules
+coreagent/web/frontend/dist
+**/__pycache__
+**/*.pyc
+.git
+.pytest_cache
+.ruff_cache
+.mypy_cache

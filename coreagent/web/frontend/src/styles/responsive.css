@@ -1,0 +1,15 @@
+/* 自适应（#0026 T3，reference §9）。 */
+
+/* 窄屏：欢迎语降级、内容列贴边。 */
+@media (max-width: 768px) {
+  .greeting__text {
+    font-size: 27px;
+  }
+  .home-view__col {
+    margin-top: clamp(24px, 10vh, 90px);
+  }
+  .message-list__col {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

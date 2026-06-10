@@ -1,8 +1,6 @@
 """read_file：读取文件全文（免确认）。"""
 
-from pathlib import Path
-
-from coreagent.tools.base import Tool, ToolResult
+from coreagent.tools.base import PathEscapeError, Tool, ToolResult, resolve_confined
 
 
 class ReadFileTool(Tool):
@@ -17,9 +15,12 @@ class ReadFileTool(Tool):
     }
     requires_confirmation = False
 
-    def execute(self, arguments: dict) -> ToolResult:
+    def execute(self, arguments: dict, cwd: str | None = None, cancel=None) -> ToolResult:
         path = arguments.get("path", "")
-        p = Path(path)
+        try:
+            p = resolve_confined(cwd, path)
+        except PathEscapeError as e:
+            return ToolResult.fail(f"read_file 失败：{e}")
         if not p.exists() or not p.is_file():
             return ToolResult.fail(f"read_file 失败：文件不存在：{path}")
         try:

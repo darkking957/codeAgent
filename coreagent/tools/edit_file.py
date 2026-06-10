@@ -8,7 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from coreagent.tools.base import Tool, ToolResult
+from coreagent.tools.base import PathEscapeError, Tool, ToolResult, resolve_confined
 
 
 class EditFileTool(Tool):
@@ -29,11 +29,14 @@ class EditFileTool(Tool):
     }
     requires_confirmation = True
 
-    def execute(self, arguments: dict) -> ToolResult:
+    def execute(self, arguments: dict, cwd: str | None = None, cancel=None) -> ToolResult:
         path = arguments.get("path", "")
         old_string = arguments.get("old_string", "")
         new_string = arguments.get("new_string", "")
-        p = Path(path)
+        try:
+            p = resolve_confined(cwd, path)
+        except PathEscapeError as e:
+            return ToolResult.fail(f"edit_file 失败：{e}")
         if not p.exists() or not p.is_file():
             return ToolResult.fail(f"edit_file 失败：文件不存在：{path}")
         try:

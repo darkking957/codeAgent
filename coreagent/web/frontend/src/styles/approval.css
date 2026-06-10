@@ -1,0 +1,42 @@
+/* 人在回路审批浮层（#0026 T8）。 */
+
+.approval__caption {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.approval__input {
+  background: var(--code-bg);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 40vh;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  margin: 0;
+}
+.approval__note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  color: #92660b;
+  font-size: 13px;
+}
+:root[data-theme="dark"] .approval__note {
+  color: #e0b65a;
+}
+.approval__note-strong {
+  font-weight: 600;
+}
+.approval__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}

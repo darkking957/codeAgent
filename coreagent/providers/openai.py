@@ -31,6 +31,7 @@ class OpenAIProvider(BaseProvider):
         messages: list[dict],
         system: str | list | None = None,
         tools: list[dict] | None = None,
+        model_override: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
         # OpenAI 行为不变（#0006）：仍以单条 system 字符串发送、忽略 tools、不做缓存。
         # system 若为结构化块（#0006 T4）则拍平回单字符串、丢弃 cache_control。
@@ -43,7 +44,7 @@ class OpenAIProvider(BaseProvider):
         # 我们内部用普通 dict 表示消息；在 SDK 边界 cast 为其 TypedDict 入参类型。
         # 同时 stream=True（字面量）让重载解析为 AsyncStream，可直接 async for 迭代。
         stream = await self.client.chat.completions.create(
-            model=self.config.model,
+            model=model_override or self.config.model,
             messages=cast(list[ChatCompletionMessageParam], chat_messages),
             stream=True,
         )

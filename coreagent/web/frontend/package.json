@@ -1,0 +1,26 @@
+{
+  "name": "coreagent-web-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CoreAgent Web 前端：像素级复刻 claude.ai（#0026）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-textarea-autosize": "^8.5.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

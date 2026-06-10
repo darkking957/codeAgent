@@ -64,6 +64,24 @@ config.yaml
 *.p12
 secrets/
 
+# 注：docker-compose.prod.yml 与 Caddyfile 不含明文机密（密钥走 .env），随仓库入库。
+# Caddyfile 仅含域名 + 门口令的 bcrypt 哈希（单向）；仓库若公开可考虑把哈希也外置。
+
+# ── 部署仓库：不纳入内部规格 / 测试 / e2e 脚本 ──────────────────
+# specs 与 tests 仅本地保留（不再随仓库分发，故也不再被版本管理）；保留 scripts/build_frontend.sh（部署用）。
+specs/
+tests/
+scripts/e2e_teams.py
+scripts/web_e2e_*.py
+
+# ── CoreAgent 本地配置（#0007 权限系统）──────────────────────
+# Local 作用域为本地临时覆盖，不进 Git（含 persist 落盘的 allow 规则）。
+.coreagent/settings.local.json
+
+# ── CoreAgent 本地个人级指令（#0010 记忆系统）────────────────
+# 本地个人级项目指令文件不入库（仅本机生效）。
+COREAGENT.local.md
+
 # ── 数据库 / 向量库 ───────────────────────────────────────
 *.db
 *.sqlite

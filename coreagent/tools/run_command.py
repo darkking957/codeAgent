@@ -16,6 +16,7 @@ import time
 from collections.abc import Callable
 
 from coreagent.tools.base import Tool, ToolResult
+from coreagent.tools.exec_policy import SandboxUnavailable, wrap_subprocess
 
 # 默认整体超时（秒）：构建 / 测试 / 安装类命令偏长，给足余量；超时文案与生效值保持一致。
 DEFAULT_TIMEOUT = 120
@@ -23,8 +24,10 @@ DEFAULT_TIMEOUT = 120
 MAX_TIMEOUT = 600
 # 静默心跳间隔（秒）：命令长时间无输出时，每隔该秒数回显一行「执行中… Ns」，让用户看到仍在跑。
 _HEARTBEAT_INTERVAL = 5.0
-# 进程 wait 的轮询粒度（秒）：兼顾超时判定 / 心跳节奏的响应度与空转开销。
+# 进程 wait 的轮询粒度（秒）：兼顾超时判定 / 心跳节奏 / 取消响应度与空转开销。
 _POLL_INTERVAL = 0.5
+# 流式途中被取消时回灌模型的文案（#0021；与超时收尾同走进程组 kill 路径）。
+CANCELLED_MESSAGE = "命令已取消（流式途中收到取消信号，进程组已终止）"
 
 
 class RunCommandTool(Tool):
@@ -88,22 +91,35 @@ class RunCommandTool(Tool):
             return self.timeout
         return min(val, MAX_TIMEOUT)
 
-    def execute(self, arguments: dict) -> ToolResult:
+    def execute(self, arguments: dict, cwd: str | None = None, cancel=None) -> ToolResult:
         command = arguments.get("command", "")
         if not command.strip():
             return ToolResult.fail("run_command 失败：command 为空")
         timeout = self._resolve_timeout(arguments)
 
+        # 执行级沙箱（#0025）：有活跃策略（web 多用户）→ 把命令经 bwrap 关进 workspace（断网 / 只读
+        # 系统 / 仅 workspace 可写 / 清密钥环境 / rlimit）；探测沙箱不可用即 fail-closed（绝不无沙箱执行）。
+        # 无策略（CLI）→ 原样命令、不设 preexec（旧行为不变）。
+        try:
+            wrapped = wrap_subprocess(["/bin/sh", "-c", command], cwd)
+        except SandboxUnavailable as e:
+            return ToolResult.fail(f"run_command 失败：{e}")
+
         try:
             proc = subprocess.Popen(
-                ["/bin/sh", "-c", command],
+                wrapped.argv,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,  # 行缓冲，配合逐行读实现实时回显
-                # 独立进程组：超时时整组 kill，连带 sh 派生的子孙进程（如 sleep），
+                # 子进程工作目录（#0015）：按调用透传的 cwd（隔离子 Agent = 其工作树绝对路径）；
+                # None 时退回进程 cwd（旧行为不变）。沙箱化时 bwrap 另以 --chdir 切到 workspace。
+                cwd=cwd,
+                # 独立进程组：超时时整组 kill，连带 sh / bwrap 派生的子孙进程（如 sleep），
                 # 否则子孙继承管道写端不闭合 → reader 线程读不到 EOF → 收尾 join 卡死。
                 start_new_session=True,
+                # 沙箱策略下设 rlimit（preexec_fn 在子进程 exec 前跑）；无策略时为 None（不设）。
+                preexec_fn=wrapped.preexec,
             )
         except OSError as e:
             return ToolResult.fail(f"run_command 失败：无法启动命令：{e}")
@@ -129,7 +145,13 @@ class RunCommandTool(Tool):
         start = time.monotonic()
         next_beat = start + _HEARTBEAT_INTERVAL
         timed_out = False
+        cancelled = False
         while True:
+            # 取消优先（#0021）：每个轮询粒度先查取消令牌（asyncio.Event.is_set() 跨线程读安全），
+            # 命中即与超时同走进程组 kill 收尾——长命令在 ~_POLL_INTERVAL 内即时被杀、不跑满。
+            if cancel is not None and cancel.is_set():
+                cancelled = True
+                break
             try:
                 proc.wait(timeout=_POLL_INTERVAL)
                 break
@@ -142,11 +164,15 @@ class RunCommandTool(Tool):
                     self._emit(f"… 执行中（{int(now - start)}s）")
                     next_beat = now + _HEARTBEAT_INTERVAL
 
-        if timed_out:
+        if timed_out or cancelled:
             # 整组 kill（连带子孙）→ 管道写端尽数闭合 → reader 线程迅速读到 EOF 退出。
+            # 取消与超时共用同一收尾路径（spec：取消走同款进程组终止），仅回灌文案不同。
             self._kill_process_group(proc)
             t_out.join(timeout=1.0)
             t_err.join(timeout=1.0)
+            if cancelled:
+                self._emit(f"✗ 已取消：{int(time.monotonic() - start)}s（进程组已终止）")
+                return ToolResult.fail(CANCELLED_MESSAGE)
             self._emit(f"✗ 超时：{int(time.monotonic() - start)}s（上限 {timeout}s）")
             # 文案与既有契约保持一致：命令执行超时（超过 N 秒）。
             return ToolResult.fail(f"命令执行超时（超过 {timeout} 秒）")

@@ -1,0 +1,65 @@
+/* 首页空态（#0026 T5，reference §5/§6.7-6.9）。 */
+
+.home-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.home-view__col {
+  width: 100%;
+  max-width: calc(var(--content-max) + 32px);
+  padding: 0 16px 48px;
+  /* 首屏内容垂直居中偏上（约视口 38%-45%）。 */
+  margin-top: clamp(40px, 15vh, 170px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.greeting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.greeting__text {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 16px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--t-hover) ease, border-color var(--t-hover) ease;
+}
+.chip:hover {
+  background: var(--bg-hover);
+}
+.chip:active {
+  background: var(--bg-active);
+}
+.chip__icon {
+  color: var(--text-secondary);
+}

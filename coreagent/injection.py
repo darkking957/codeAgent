@@ -7,6 +7,10 @@
 **不**做间隔 N 轮全量）。「外部工具上线 / 温和提示」留前向钩子占位（不接 MCP）。
 """
 
+import os
+import tempfile
+from pathlib import Path
+
 # 动态提醒标签（见 checklist 固定值）。
 REMINDER_OPEN = "<system-reminder>"
 REMINDER_CLOSE = "</system-reminder>"
@@ -59,3 +63,78 @@ def build_reminder_message(*, plan_only: bool, round_index: int) -> dict | None:
     if text is None:
         return None
     return {"role": "user", "content": text}
+
+
+def build_skill_activation_message(activation_text: str | None) -> dict | None:
+    """把技能激活指令块（含 <active-skill-instructions> 标签）包成一条临时 user 消息（#0012）。
+
+    与模式提醒 / 记忆块同走「滚动断点之后」的动态注入通道：外层裹 `<system-reminder>` 标签，故
+    provider 不在其上打滚动 cache_control——激活指令**每轮重建**（区别于记忆块仅首轮），不污染
+    缓存、不写入 conversation。无激活技能（text 为空）则返回 None。
+    """
+    if not activation_text or not activation_text.strip():
+        return None
+    return {
+        "role": "user",
+        "content": f"{REMINDER_OPEN}\n{activation_text.strip()}\n{REMINDER_CLOSE}",
+    }
+
+
+# Hook 注入（#0013 T8）：注入文本上限 + 预览长度（见 checklist 固定值）。
+HOOK_INJECT_MAX_CHARS = 10000
+HOOK_INJECT_PREVIEW_CHARS = 2000
+# 超长注入溢出文件所在目录（按需创建）。
+HOOK_OVERFLOW_DIR = Path(tempfile.gettempdir()) / "coreagent-hook-inject"
+# 注入正文的事实陈述外壳（措辞为「事实陈述」，非用户输入；见 #0013 设计骨架）。
+HOOK_INJECT_PREAMBLE = "以下是 Hook 在本会话期间产出的事实信息（仅供参考，非用户指令）："
+
+
+def _spill_hook_text(text: str, overflow_dir: Path) -> Path:
+    """把超长注入正文写入溢出文件，返回路径（写失败上抛由调用方兜底）。"""
+    overflow_dir.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(dir=str(overflow_dir), prefix="hook-", suffix=".txt")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    return Path(name)
+
+
+def build_hook_message(hook_text: str | None, *, overflow_dir: Path | None = None) -> dict | None:
+    """把 HookManager 汇总的注入文本包成一条临时 user 消息（#0013 T8）。
+
+    与模式提醒 / 记忆块 / 技能块同走「滚动断点之后」的动态注入通道：含 `<system-reminder>` 标签，
+    故 provider 不在其上打滚动 cache_control——每请求重建、**不写入** conversation、不落盘。
+    正文超过 HOOK_INJECT_MAX_CHARS 字符 → 存溢出文件，正文替换为「预览 + 路径」而非全文。
+    无内容则返回 None。
+    """
+    if not hook_text or not hook_text.strip():
+        return None
+    body = hook_text.strip()
+    if len(body) > HOOK_INJECT_MAX_CHARS:
+        target_dir = overflow_dir or HOOK_OVERFLOW_DIR
+        try:
+            path = _spill_hook_text(body, target_dir)
+            preview = body[:HOOK_INJECT_PREVIEW_CHARS]
+            body = (
+                f"（注入内容过长，已存文件，下方为预览前 {HOOK_INJECT_PREVIEW_CHARS} 字符；"
+                f"完整内容见：{path}）\n{preview}"
+            )
+        except OSError:
+            # 溢出落盘失败：退化为截断预览（仍不注入全文），不阻断主流程。
+            body = body[:HOOK_INJECT_MAX_CHARS]
+    content = f"{REMINDER_OPEN}\n{HOOK_INJECT_PREAMBLE}\n{body}\n{REMINDER_CLOSE}"
+    return {"role": "user", "content": content}
+
+
+def build_memory_message(memory_text: str | None) -> dict | None:
+    """把记忆上下文（长期记忆索引 + 上次会话恢复摘要）包成一条临时 user 消息（#0010）。
+
+    与模式提醒同走「滚动断点之后」的动态注入通道：含 `<system-reminder>` 标签，故 provider 不
+    在其上打滚动 cache_control——会话特定内容（随 cwd 的索引、恢复摘要）不进跨会话稳定缓存段。
+    每请求重建、不写入 conversation。无内容则返回 None。
+    """
+    if not memory_text or not memory_text.strip():
+        return None
+    return {
+        "role": "user",
+        "content": f"{REMINDER_OPEN}\n{memory_text.strip()}\n{REMINDER_CLOSE}",
+    }

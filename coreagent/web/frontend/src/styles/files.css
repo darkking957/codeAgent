@@ -1,0 +1,98 @@
+/* code 模式文件树面板 + 文件查看器（#0026 T7）。 */
+
+.conversation--with-files .file-pane {
+  width: 280px;
+  flex-shrink: 0;
+}
+.file-pane {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-divider);
+  background: var(--bg-sidebar);
+  min-height: 0;
+}
+.file-pane__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--border-hairline);
+  flex-shrink: 0;
+}
+.file-pane__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.file-pane__tree {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 4px;
+}
+.file-pane__hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+}
+
+.file-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.file-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background var(--t-hover) ease;
+}
+.file-node:hover {
+  background: var(--bg-hover);
+}
+.file-node__chev {
+  flex-shrink: 0;
+  width: 14px;
+  color: var(--text-muted);
+}
+.file-node__icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.file-node--file .file-node__icon {
+  color: var(--text-muted);
+}
+.file-node__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-node--dir .file-node__name {
+  color: var(--text-primary);
+  font-weight: 450;
+}
+
+.file-viewer__body {
+  margin: 0;
+  background: var(--code-bg);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60vh;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+}

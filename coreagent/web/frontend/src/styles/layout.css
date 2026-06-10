@@ -1,0 +1,93 @@
+/* 应用外壳布局（#0026 T3，reference §5/§9）。 */
+
+.boot-splash {
+  height: 100%;
+  background: var(--bg-main);
+}
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 侧栏宿主：固定宽 + 与主区之间 1px 发丝竖线。 */
+.sidebar-host {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-divider);
+  background: var(--bg-sidebar);
+  height: 100%;
+}
+
+/* 窄屏：覆盖式抽屉 + 阴影，从左滑入。 */
+.sidebar-host.is-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 60;
+  width: min(86vw, var(--sidebar-width));
+  box-shadow: var(--shadow-popover);
+  animation: drawer-in 240ms ease;
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  z-index: 55;
+}
+
+.main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  position: relative;
+}
+
+.main-topbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+.main-topbar__spacer {
+  flex: 1;
+}
+
+/* 轻量错误提示（底部居中浮现）。 */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: var(--bg-elevated);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  z-index: 200;
+  box-shadow: var(--shadow-popover);
+  animation: toast-in 150ms ease;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
