@@ -8,7 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from coreagent.tools.base import Tool, ToolResult
+from coreagent.tools.base import PathEscapeError, Tool, ToolResult, resolve_confined
 
 
 class WriteFileTool(Tool):
@@ -24,10 +24,13 @@ class WriteFileTool(Tool):
     }
     requires_confirmation = True
 
-    def execute(self, arguments: dict) -> ToolResult:
+    def execute(self, arguments: dict, cwd: str | None = None, cancel=None) -> ToolResult:
         path = arguments.get("path", "")
         content = arguments.get("content", "")
-        p = Path(path)
+        try:
+            p = resolve_confined(cwd, path)
+        except PathEscapeError as e:
+            return ToolResult.fail(f"write_file 失败：{e}")
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
             self._atomic_write(p, content)

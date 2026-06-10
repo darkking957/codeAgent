@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator
 
+from coreagent.events import Retry
 from coreagent.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
@@ -37,27 +38,29 @@ async def stream_with_retry(
     *,
     system: str | list | None = None,
     tools: list[dict] | None = None,
+    model_override: str | None = None,
     max_retries: int = 3,
-    on_retry: Callable[[int, int], None] | None = None,
-) -> AsyncGenerator[StreamChunk, None]:
+) -> AsyncGenerator[StreamChunk | Retry, None]:
     """对瞬时错误退避重试的流式封装。
 
     - 仅对可重试异常退避：1 / 2 / 4 秒；不可恢复错误立即上抛。
     - 已 yield 过任何 chunk 的尝试若再异常，则不重试、直接上抛（避免重复刷屏）。
-    - 重试对用户的可见性经 ``on_retry(attempt, wait)`` 回调注入；诊断走 logging。
-    - ``system`` / ``tools`` 透传给 provider；不传时与纯对话路径行为一致。
+    - 重试对用户的可见性经**内联 yield** ``Retry`` 事件（退避 sleep 之前）注入：保留「先提示 →
+      再等待 → 后重发」时序；诊断走 logging。消费者据 ``isinstance`` 区分 ``StreamChunk`` 与 ``Retry``。
+    - ``system`` / ``tools`` / ``model_override`` 透传给 provider；不传时与纯对话路径行为一致。
     """
     for attempt in range(max_retries + 1):
         if attempt > 0:
             wait = 2 ** (attempt - 1)  # 1s / 2s / 4s
-            if on_retry is not None:
-                on_retry(attempt, wait)
+            yield Retry(attempt, wait)  # 退避前先提示（单向事件，消费者据类型区分透传）
             logger.warning("第 %d/%d 次重试，%ds 后发起", attempt, max_retries, wait)
             await asyncio.sleep(wait)
 
         yielded = False
         try:
-            async for chunk in provider.stream_chat(messages, system=system, tools=tools):
+            async for chunk in provider.stream_chat(
+                messages, system=system, tools=tools, model_override=model_override
+            ):
                 yielded = True
                 yield chunk
             return

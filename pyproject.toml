@@ -20,6 +20,18 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.10",
 ]
+# 双模式 Web 层（#0020）：仅 Web 入口需要；核心 CLI/TUI 不依赖，保持核心安装精简。
+# 富渲染（#0024）：assistant 文本 Markdown→净化 HTML + 代码高亮，纯 Python、随服务端发出（不取 CDN）。
+# 多用户/安全（#0025）：argon2-cffi（argon2id 密码哈希）+ psycopg（Postgres 同步驱动，部署后端）。
+# 沙箱（bubblewrap）是**系统级**依赖（apt），不在此处（见 Dockerfile）。
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "markdown>=3.5",
+    "pygments>=2.17",
+    "argon2-cffi>=23.1",
+    "psycopg[binary]>=3.1",
+]
 
 [project.scripts]
 coreagent = "coreagent.main:main"

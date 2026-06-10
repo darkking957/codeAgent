@@ -1,0 +1,32 @@
+# CI（#0025 能力 11）：一条流水线跑 lint（ruff）+ 测试（pytest 全量回归）。
+#
+# 沙箱：装 bubblewrap 便于沙箱相关用例运行；但无特权 CI 可能不允许 bwrap `unshare`——本仓 pytest
+# 套件**不依赖**真沙箱（路径约束是纯 Python；沙箱 fail-closed 用例 monkeypatch 探测为不可用），
+# 故 CI 无需放权即全绿。需真沙箱的隔离闭环在 scripts/web_e2e_0025.py（本地 / 放权环境跑，不入 CI）。
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install bubblewrap (OS sandbox; best-effort)
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,web]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Test (pytest)
+        run: pytest

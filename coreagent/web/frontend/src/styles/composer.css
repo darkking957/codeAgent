@@ -1,0 +1,175 @@
+/* 输入框 composer（#0026 T5/T6，reference §6.8）。 */
+
+.composer {
+  width: 100%;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-composer);
+  padding: 16px 16px 12px;
+  transition: box-shadow var(--t-focus) ease;
+}
+.composer:focus-within {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 2px var(--focus-ring);
+}
+
+.composer__input {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  outline: none;
+  resize: none;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.composer__input::placeholder {
+  color: var(--text-placeholder);
+}
+.composer__input:disabled {
+  opacity: 0.7;
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 8px;
+}
+.composer-toolbar__left,
+.composer-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* + 附件按钮：圆形描边（reference §6.8）。 */
+.icon-btn.composer__attach {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background var(--t-hover) ease, color var(--t-hover) ease;
+}
+.mode-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.mode-pill--readonly {
+  cursor: default;
+  border-style: dashed;
+}
+.mode-pill--readonly:hover {
+  background: none;
+  color: var(--text-secondary);
+}
+
+/* 模型 / 推理：只读展示（非按钮，无 hover/click）。 */
+.readonly-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: default;
+  user-select: none;
+}
+.readonly-pill__chev {
+  color: var(--text-muted);
+}
+
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--bg-active);
+  color: var(--text-muted);
+  transition: background var(--t-focus) ease, transform var(--t-focus) ease;
+}
+.send-btn:disabled {
+  cursor: default;
+}
+.send-btn.is-ready {
+  background: var(--accent);
+  color: var(--on-accent);
+  animation: send-pop var(--t-focus) ease;
+}
+.send-btn.is-ready:hover {
+  background: var(--accent-strong);
+}
+@keyframes send-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.send-btn--stop {
+  background: var(--text-primary);
+  color: var(--bg-elevated);
+}
+.send-btn--stop:hover {
+  background: var(--text-secondary);
+}
+
+/* —— 附件胶囊 —— */
+.attach-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+  color: var(--text-secondary);
+}
+.attach-chip__name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-chip__rm {
+  display: inline-flex;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 0;
+}
+.attach-chip__rm:hover {
+  color: #c0392b;
+}
+.attach-chip--static {
+  background: var(--bg-elevated);
+}

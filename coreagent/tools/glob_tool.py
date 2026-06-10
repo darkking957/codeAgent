@@ -9,7 +9,13 @@ from pathlib import Path
 
 import pathspec
 
-from coreagent.tools.base import Tool, ToolResult
+from coreagent.tools.base import (
+    PathEscapeError,
+    Tool,
+    ToolResult,
+    confined_root,
+    resolve_confined,
+)
 
 
 class GlobTool(Tool):
@@ -25,11 +31,16 @@ class GlobTool(Tool):
     }
     requires_confirmation = False
 
-    def execute(self, arguments: dict) -> ToolResult:
+    def execute(self, arguments: dict, cwd: str | None = None, cancel=None) -> ToolResult:
         pattern = arguments.get("pattern", "")
-        root = Path(arguments.get("path") or ".").resolve()
+        try:
+            root = resolve_confined(cwd, arguments.get("path") or ".").resolve()
+        except PathEscapeError as e:
+            return ToolResult.fail(f"glob 失败：{e}")
         if not root.is_dir():
             return ToolResult.fail(f"glob 失败：目录不存在：{root}")
+        # 约束生效时：绝对 pattern 指向 root 外的命中一律丢弃（不泄露 workspace 外路径）。
+        confined = confined_root() is not None
 
         spec = self._load_gitignore(root)
         matches: list[str] = []
@@ -54,8 +65,9 @@ class GlobTool(Tool):
                 if spec.match_file(probe):
                     continue
                 matches.append(rel_str)
-            else:
-                # root 外（绝对 pattern 指向别处）：不做 gitignore 过滤，原样返回。
+            elif not confined:
+                # root 外（绝对 pattern 指向别处）：约束未生效时不做 gitignore 过滤、原样返回；
+                # 约束生效（web 多用户）→ 丢弃（不泄露 workspace 子树外路径）。
                 matches.append(str(full))
 
         matches.sort()

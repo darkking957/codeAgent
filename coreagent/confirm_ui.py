@@ -2,7 +2,8 @@
 
 写类工具执行前的确认环节：把 `[y/N]` 一行问句升级为内联富交互菜单，复刻 Claude Code
 CLI 的确认风格——区域标签 / 内容预览块 / 分隔线 / 确认问句 / 选项列表 / 快捷键提示条
-六个组件，并把「同意 / 同意且本会话不再询问此工具 / 拒绝」三个出口落到方向键可选菜单。
+六个组件，并把「同意 / 本会话不再询问 / 永久写入规则 / 拒绝」四个出口落到方向键可选菜单
+（#0007 在 #0005 三态基础上扩展出 persist 出口）。
 
 分层（便于脱离 TUI 单测）：
   - 预览构建（build_preview）/ 六组件渲染（render_menu 及各 _render_*）都是纯函数：
@@ -11,7 +12,8 @@ CLI 的确认风格——区域标签 / 内容预览块 / 分隔线 / 确认问�
     内联模式的键绑定与定时刷新，返回三态决策。
   - 非 TTY 降级（confirm_plain）：管道 / 重定向 / CI 下回落纯文本 y/N（默认拒绝）。
 
-不改 #0004 的确认回调契约：三态语义在本模块 / TUI 内收敛，循环侧仍只见「同意 / 拒绝」二态。
+四态决策在本模块产出，TUI 侧映射为结构化 ConfirmDecision（once/session/persist/reject）回传
+循环（#0007 升级确认契约，supersedes #0004/#0005 的 bool）。
 渲染对缺字段 / 异常输入有兜底，最坏回落朴素文本，不拖垮确认。
 """
 
@@ -33,11 +35,13 @@ from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
 
-# ── 三态决策（confirm_interactive 返回值）；TUI 侧收敛成二态回传循环 ──────────────
-APPROVE = "approve"               # 同意执行
-APPROVE_ALWAYS = "approve_always"  # 同意，本会话内不再询问此工具
+# ── 四态决策（confirm_interactive 返回值）；TUI 侧映射为结构化 ConfirmDecision 回传循环 ──
+# 在 #0005 三态基础上扩展出 persist 出口（#0007 HITL 三级粒度 once/session/persist + 拒绝）。
+APPROVE = "approve"               # 同意执行（once）
+APPROVE_ALWAYS = "approve_always"  # 同意，本会话内不再询问此工具（session）
+PERSIST = "persist"               # 同意并永久写入规则（persist）
 REJECT = "reject"                 # 拒绝 / esc / Ctrl+C
-_DECISIONS = [APPROVE, APPROVE_ALWAYS, REJECT]  # 下标 0/1/2 对应选项 1/2/3
+_DECISIONS = [APPROVE, APPROVE_ALWAYS, PERSIST, REJECT]  # 下标 0/1/2/3 对应选项 1/2/3/4
 
 # ── 固定值（见 checklist「固定值」表）──────────────────────────────────────────
 # 区域标签文案：按工具名分派。
@@ -228,10 +232,11 @@ def _lexer_for(path: str) -> str | None:
 
 # ── T2：六组件渲染（纯函数 → 可渲染内容）─────────────────────────────────────
 def option_labels(tool_name: str) -> list[str]:
-    """三个选项文案（含工具名插值），见 checklist 固定值。"""
+    """四个选项文案（含工具名插值），见 checklist 固定值。"""
     return [
         "同意执行",
         f"同意，本会话内不再询问 {tool_name}",
+        "同意并永久写入规则",
         "拒绝",
     ]
 
@@ -363,9 +368,9 @@ def render_text(preview: Preview, selected_index: int, cursor_on: bool, width: i
 
 # ── T3：内联交互应用（按键 → 三态决策）──────────────────────────────────────
 async def confirm_interactive(preview: Preview, *, input=None, output=None) -> str:
-    """弹出内联富菜单，返回三态决策（APPROVE / APPROVE_ALWAYS / REJECT）。
+    """弹出内联富菜单，返回四态决策（APPROVE / APPROVE_ALWAYS / PERSIST / REJECT）。
 
-    基于 prompt_toolkit 非全屏内联模式：方向键 ↑↓ 导航（回绕）、数字 1·2·3 直选、
+    基于 prompt_toolkit 非全屏内联模式：方向键 ↑↓ 导航（回绕）、数字 1·2·3·4 直选、
     回车确认、esc / Ctrl+C 取消（归拒绝）。定时刷新驱动问句尾光标闪烁；确认后不擦除
     （留痕滚动历史）。input/output 仅供测试注入。
     """
@@ -380,17 +385,11 @@ async def confirm_interactive(preview: Preview, *, input=None, output=None) -> s
     def _down(event):
         state["index"] = (state["index"] + 1) % len(_DECISIONS)
 
-    @kb.add("1")
-    def _one(event):
-        state["index"] = 0
-
-    @kb.add("2")
-    def _two(event):
-        state["index"] = 1
-
-    @kb.add("3")
-    def _three(event):
-        state["index"] = 2
+    # 数字 1..N 直选对应选项（随 _DECISIONS 长度自适应，含 persist 出口）。
+    for _i in range(len(_DECISIONS)):
+        @kb.add(str(_i + 1))
+        def _select(event, _idx=_i):
+            state["index"] = _idx
 
     @kb.add("enter")
     def _enter(event):
