@@ -1,0 +1,16 @@
+codelabrory.com {
+    # ── 前门：共享口令（basic_auth）──────────────────────────────────────────
+    # 只给信任好友的「门口令」。陌生人过不了这道门，连后面的 app / 注册页都摸不到。
+    # 门后保持 COREAGENT_WEB_DEV=1（验证码自助回带，注册免接真短信）。
+    #
+    # 生成下面的 bcrypt 哈希（口令自己定，发给好友）：
+    #   docker run --rm caddy:2 caddy hash-password --plaintext '你的门口令'
+    # 把输出整段粘到 friend 后面（用户名 friend 可改；多人就加多行 用户名 哈希）。
+    basic_auth {
+        # 门口令的 bcrypt 哈希（cost 14）。发给好友的是明文口令本身，不是这串哈希。
+        friend $2b$14$AFjNndByiF9orI6xnFE3WuDafOaTrevH2knuKPlI7Xc0KztT29vZm
+    }
+
+    # ── 反代到内网 app（Caddy 自动申请 / 续期 Let's Encrypt 证书，HTTPS 一步到位）──
+    reverse_proxy app:8000
+}

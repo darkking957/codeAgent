@@ -1,0 +1,9 @@
+protocol: anthropic      # anthropic | openai
+model: deepseek-v4-flash
+base_url: "https://api.deepseek.com/anthropic"             # 留空使用默认地址
+api_key: ${ANTHROPIC_API_KEY}   # 从环境变量读取（容器经 .env 注入；本地运行需先 export）
+
+# Extended thinking（仅 Anthropic 支持）
+thinking:
+  enabled: false
+  budget_tokens: 10000
